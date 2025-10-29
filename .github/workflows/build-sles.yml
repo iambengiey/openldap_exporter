@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       # Using SLES 15 SP3 BCI base image for GLIBC 2.31 compatibility
-      image: registry.suse.com/suse/ltss/sle15.3/sle15:15.3
+      image: rregistry.suse.com/suse/sle15:15.6
       
     steps:
       - name: Install Dependencies (Go 1.22 & OpenLDAP devel) 📦
