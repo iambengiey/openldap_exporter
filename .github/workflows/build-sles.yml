@@ -1,0 +1,39 @@
+name: Build SLES Binary
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    name: Build on SLES
+    runs-on: ubuntu-latest
+    container:
+      image: registry.suse.com/bci/golang:1.22
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            /github/home/.cache/go-build
+            /github/home/go/pkg/mod
+          key: ${{ runner.os }}-sles-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-sles-go-
+
+      - name: Build linux amd64 binary
+        run: |
+          mkdir -p dist
+          GOOS=linux GOARCH=amd64 go build -o dist/openldap_exporter ./cmd/openldap_exporter
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openldap-exporter-linux-amd64
+          path: dist/openldap_exporter
