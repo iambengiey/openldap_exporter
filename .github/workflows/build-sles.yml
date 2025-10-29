@@ -15,18 +15,22 @@ jobs:
       
     steps:
       - name: Install Essential Build Tools and Dependencies 📦
-        # Install 'tar', 'gcc'/'make', and the OpenLDAP development library.
-        # SWITCHED to the short flag '-G' to skip GPG checks.
+        # Use the explicit flag --no-check-signature to bypass the expired GPG key.
         run: |
-          # Install essential tools: tar, gcc, make
-          zypper install -y -G tar gcc make
+          # 1. Force a refresh of repositories to update metadata
+          zypper ref -f
           
-          # Install OpenLDAP development libraries.
+          # 2. Install essential tools (tar, gcc, make)
+          # We use the explicit flag --no-check-signature
+          zypper install -y --no-check-signature tar gcc make
+          
+          # 3. Install OpenLDAP development libraries.
           # Try the most common SLES name first, with a fallback.
-          zypper install -y -G libldap-devel || zypper install -y -G libldap-2_4-2-devel
+          zypper install -y --no-check-signature libldap-devel || zypper install -y --no-check-signature libldap-2_4-2-devel
           
 ---
       - name: Checkout Source Code
+        # This will now succeed because 'tar' is installed in the previous step.
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
