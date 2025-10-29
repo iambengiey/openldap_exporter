@@ -1,4 +1,4 @@
-name: Build SLES Binary
+name: Build SLES Binary (GLIBC 2.31 Compatible)
 
 on:
   push:
@@ -7,33 +7,50 @@ on:
 
 jobs:
   build:
-    name: Build on SLES
+    name: Build on SLES 15 SP3 (GLIBC 2.31)
     runs-on: ubuntu-latest
     container:
-      image: registry.suse.com/bci/golang:1.22
+      # Using SLES 15 SP3 BCI base image for GLIBC 2.31 compatibility
+      image: registry.suse.com/bci/sles:15.3
+      
     steps:
-      - name: Checkout
+      - name: Install Dependencies (Go 1.22 & OpenLDAP devel) 📦
+        # SLES 15 SP3 may not have Go 1.22 by default, so we install it,
+        # along with the ldap-devel package required for cgo to link against OpenLDAP.
+        run: |
+          zypper install -y go1.22 ldap-devel
+          # Create symlink for global go command access
+          ln -s /usr/lib/go-1.22/bin/go /usr/bin/go
+
+---
+      - name: Checkout Source Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Trust workspace for git
+        # Necessary when running Git commands inside a non-root container environment
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
+        
+---
       - name: Set up Go cache
         uses: actions/cache@v4
         with:
           path: |
             /github/home/.cache/go-build
             /github/home/go/pkg/mod
-          key: ${{ runner.os }}-sles-go-${{ hashFiles('**/go.sum') }}
+          # Changed cache key to reflect SLES 15.3 for better separation
+          key: ${{ runner.os }}-sles15.3-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-sles-go-
+            ${{ runner.os }}-sles15.3-go-
 
-      - name: Build linux amd64 binary
+---
+      - name: Build linux amd64 binary (CGO Enabled) 🔨
+        # CGO_ENABLED=1 ensures the Go binary links dynamically against the 
+        # SLES 15 SP3 glibc 2.31 libraries, fixing the runtime error.
         run: |
           mkdir -p dist
-          GOOS=linux GOARCH=amd64 go build -o dist/openldap_exporter ./cmd/openldap_exporter
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -o dist/openldap_exporter ./cmd/openldap_exporter
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
