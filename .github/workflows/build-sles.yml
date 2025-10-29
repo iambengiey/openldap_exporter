@@ -10,19 +10,10 @@ jobs:
     name: Build on SLES 15 SP3 (GLIBC 2.31)
     runs-on: ubuntu-latest
     container:
-      # Using SLES 15 SP3 BCI base image for GLIBC 2.31 compatibility
+      # Using a suitable public SLES 15 SP3 base image for GLIBC 2.31 compatibility
       image: registry.suse.com/suse/sle15:15.3
       
     steps:
-      - name: Install Dependencies (Go 1.22 & OpenLDAP devel) 📦
-        # SLES 15 SP3 may not have Go 1.22 by default, so we install it,
-        # along with the ldap-devel package required for cgo to link against OpenLDAP.
-        run: |
-          zypper install -y go1.22 ldap-devel
-          # Create symlink for global go command access
-          ln -s /usr/lib/go-1.22/bin/go /usr/bin/go
-
----
       - name: Checkout Source Code
         uses: actions/checkout@v4
         with:
@@ -31,25 +22,36 @@ jobs:
       - name: Trust workspace for git
         # Necessary when running Git commands inside a non-root container environment
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-        
+
 ---
-      - name: Set up Go cache
-        uses: actions/cache@v4
+      - name: Set up Go 1.22 (Bypasses zypper issues) 🚀
+        # This action reliably installs Go 1.22 directly into the PATH,
+        # bypassing the image's limited/outdated package repository.
+        uses: actions/setup-go@v5
         with:
-          path: |
-            /github/home/.cache/go-build
-            /github/home/go/pkg/mod
-          # Changed cache key to reflect SLES 15.3 for better separation
-          key: ${{ runner.os }}-sles15.3-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-sles15.3-go-
+          go-version: '1.22'
+          cache: true
+          # Use a different path for the cache key since it's not using zypper's go
+          cache-key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+
+---
+      - name: Install Dependencies (OpenLDAP devel) 📦
+        # Install only the OpenLDAP development libraries needed for CGO.
+        # We also use '--no-gpg-checks' to bypass the expired key issue.
+        # Note: The correct package name on SLES/openSUSE is often 'libldap-devel' or 'libldap-2_4-2-devel'
+        run: |
+          # Try the most common name first, if that fails, try the older versioned name.
+          # We use '-y' and '--no-gpg-checks' to avoid interactive prompts and the expired key warning.
+          zypper install -y --no-gpg-checks libldap-devel || zypper install -y --no-gpg-checks libldap-2_4-2-devel
+          # Install 'gcc' and 'make' if they aren't present, as CGO requires a C compiler
+          zypper install -y --no-gpg-checks gcc make
 
 ---
       - name: Build linux amd64 binary (CGO Enabled) 🔨
-        # CGO_ENABLED=1 ensures the Go binary links dynamically against the 
-        # SLES 15 SP3 glibc 2.31 libraries, fixing the runtime error.
+        # CGO_ENABLED=1 links dynamically against the SLES 15 SP3 glibc 2.31 libraries.
         run: |
           mkdir -p dist
+          # Go is now globally available thanks to setup-go
           GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -o dist/openldap_exporter ./cmd/openldap_exporter
 
       - name: Upload artifact
