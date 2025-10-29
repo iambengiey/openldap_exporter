@@ -15,18 +15,18 @@ jobs:
       
     steps:
       - name: Install Essential Build Tools and Dependencies 📦
-        # Install 'tar' (needed for checkout), 'gcc'/'make' (needed for CGO), 
-        # and the OpenLDAP development library.
-        # We use '--no-gpg-checks' to bypass the expired GPG key issue.
+        # Install 'tar', 'gcc'/'make', and the OpenLDAP development library.
+        # SWITCHED to the short flag '-G' to skip GPG checks.
         run: |
-          zypper install -y --no-gpg-checks tar gcc make
-          # Install OpenLDAP development libraries. 
+          # Install essential tools: tar, gcc, make
+          zypper install -y -G tar gcc make
+          
+          # Install OpenLDAP development libraries.
           # Try the most common SLES name first, with a fallback.
-          zypper install -y --no-gpg-checks libldap-devel || zypper install -y --no-gpg-checks libldap-2_4-2-devel
+          zypper install -y -G libldap-devel || zypper install -y -G libldap-2_4-2-devel
           
 ---
       - name: Checkout Source Code
-        # This will now succeed because 'tar' is installed.
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
